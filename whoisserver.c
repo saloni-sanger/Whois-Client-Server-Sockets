@@ -20,6 +20,8 @@ opens command prompt wherer you hit enter to SEND text over TCP to that hostname
 nc -l port
 listens on that port
 
+nc -l 10488 -o test.txt, then run client, can see output in file
+
 nc 127.0.0.1 10488 for exampel
 */
 
@@ -36,7 +38,9 @@ nc 127.0.0.1 10488 for exampel
 #include <arpa/inet.h> 
 #include <sys/wait.h> 
 #include <signal.h>
+
 #include "allocate.h"
+#include "protocol.h"
 
 //custom structs to return multiple things
 
@@ -109,6 +113,17 @@ void main_accept_loop(int sockfd, struct sigaction* sa) {
         if (!fork()) { // this is the child process now, if fork returned 0
             close(sockfd); // child doesn't need copy of the listener 
             
+            //recieve request struct
+            struct request* req;
+            recv(new_fd, (void*)req, sizeof(*(req)), MSG_WAITALL);
+            req->num_args = ntohl(req->num_args);
+            
+            printf("command: %s\n", req->command);
+            printf("num_args: %d\n", req->num_args);
+            for (int i = 0; i < req->num_args; i++) {
+                printf("argument %d: %s\n", i+1, req->arguments[i]);
+            }
+
             //handle client request
             //need help, how do I get messages from the client?
             //let's move onto client before doing this part
