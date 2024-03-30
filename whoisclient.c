@@ -35,6 +35,8 @@ replace get_in_addr with &(((struct sockaddr_in*)sa)->sin_addr)
 #include <cstring>
 #include <arpa/inet.h>
 
+#include "protocol.h"
+
 #define MAXDATASIZE 100 //might need to change //idea: send error if buffer to big
 
 void process_cline_request(int, char**, struct request*, struct recipient*);
@@ -43,13 +45,9 @@ void get_addresses(struct addrinfo**, struct recipient*);
 
 int connect_socket(struct addrinfo*);
 
-void recieve_and_print(int);
+void send_request(int, struct request*);
 
-struct request {
-    char* command;
-    //told we can assume max 10 arguments, each max 50 characters 
-    char* arguments[11]; //includes option (whois [option] argument-list) 10+1 = 11
-};
+void recieve_and_print(int);
 
 struct recipient { //the hostname and port in the command line is of the server "recipient" that we send to
     char* host;
@@ -67,7 +65,7 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "client: failed to connect\n"); 
         exit(1); //do i need to return???
     };
-    //send request
+    send_request(sockfd, &req);//send request
     recieve_and_print(sockfd);
     return 0;
 }
@@ -88,6 +86,13 @@ void recieve_and_print(int sockfd) {
     close(sockfd);
 
     return;
+}
+
+void send_request(int sockfd, struct request* req) { //write() the request into the sockfd
+    //strings don't have endianness
+    //only need to call htonl() on our int/size variable, ints are 32 bit so long
+    req->num_args = htonl(req->num_args); //adjust to netowrk order before sending, undo to host order when server recieves
+    write(sockfd, (void*)req, sizeof(request)); //writes request into socket
 }
 
 int connect_socket(struct addrinfo* servinfo) {
@@ -187,12 +192,25 @@ void process_cline_request(int argc, char** argv, struct request* req, struct re
         fprintf(stderr,"Internal error: the command is not supported!\n");
         exit(1);
     }
-    req->command = command;
+    //bounds check, need command line everything to be 50 or less characters so null character space isn't taken
+    if (strlen(command) > MAX_ARG_LENGTH) {
+        fprintf(stderr,"Internal error: command is over %d characters!\n", MAX_ARG_LENGTH);
+        exit(1);
+    }
+    //use memcopy to copy contents at the pointer into req member, avoids us having to change char* to char __[51] <- weird
+    memcpy(((void*)&(req->command)), (void*)command, strlen(command)+1); //+1 for null character when identifying size of string
 
+    req->num_args = argc-3;
     for (int i = 4; i <= argc; i++) { //fill out arguments in request struct
         int arg_idx = i-4;
         int cmd_line_idx = i-1;
-        req->arguments[arg_idx] = argv[cmd_line_idx];
+        //+1 for null character when identifying size of string
+        //bounds check, need command line everything to be 50 or less characters so null character space isn't taken
+        if (strlen(argv[cmd_line_idx]) > MAX_ARG_LENGTH) {
+            fprintf(stderr,"Internal error: command argument is over %d characters!\n", MAX_ARG_LENGTH);
+            exit(1);
+        }
+        memcpy(((void*)&(req->arguments[arg_idx])), (void*)(argv[cmd_line_idx]), strlen(argv[cmd_line_idx])+1);
     }
     
     return;
