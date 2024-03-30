@@ -35,9 +35,15 @@ replace get_in_addr with &(((struct sockaddr_in*)sa)->sin_addr)
 #include <cstring>
 #include <arpa/inet.h>
 
+#define MAXDATASIZE 100 //might need to change
+
 struct request process_cline_request(int, char**);
 
-int get_addresses(struct addrinfo*, struct request);
+void get_addresses(struct addrinfo*, struct request);
+
+int connect_socket(struct addrinfo*);
+
+void recieve_and_print(int);
 
 struct request {
     char* host;
@@ -47,21 +53,78 @@ struct request {
 };
 
 int main(int argc, char* argv[]) {
-    /*
-    int sockfd, numbytes;
-    char buf[100]; //might need to change
-    struct addrinfo *p; 
-    int rv; //return value
-    char s[INET_ADDRSTRLEN];
-    */
-
     struct request req;
     req = process_cline_request(argc, argv);
-    struct addrinfo *servinfo;
+    struct addrinfo* servinfo;
     get_addresses(servinfo, req);
+    int sockfd;
+    if ((sockfd = connect_socket(servinfo)) == -1) {
+        fprintf(stderr, "client: failed to connect\n"); 
+        exit(1); //do i need to return???
+    };
+    recieve_and_print(sockfd);
+    return 0;
 }
 
-int get_addresses(struct addrinfo* servinfo, struct request req) {
+//maxdatasize set to 100, this may need to change, I'm supposed to be able to show the entire whois return
+void recieve_and_print(int sockfd) {
+    int numbytes;
+    char buf[MAXDATASIZE]; //might need to change
+    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) { 
+        perror("recv");
+        exit(1); 
+    }
+    
+    buf[numbytes] = '\0';
+
+    printf("client: received '%s'\n",buf);
+
+    close(sockfd);
+
+    return;
+}
+
+int connect_socket(struct addrinfo* servinfo) {
+    int sockfd; //can make negative to return an error  -----------------------<
+    struct addrinfo* p;
+
+    if (servinfo == NULL) { //if servinfo empty return error
+        perror("client: no resources");
+        return -1;
+    }
+
+    for(p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sockfd = socket(p->ai_family, p->ai_socktype,
+                p->ai_protocol)) == -1) { 
+            perror("client: socket"); 
+            continue;
+        }
+
+        if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) { 
+            close(sockfd);
+            perror("client: connect");
+            continue; 
+        }
+
+        break; //reaches here is successfully connected to a socket
+    }
+
+    if (p == NULL) {
+        fprintf(stderr, "client: failed to connect\n"); 
+        return 2;
+    }
+
+    char s[INET_ADDRSTRLEN];
+    inet_ntop(p->ai_family, &(((struct sockaddr_in*)p)->sin_addr), 
+            s, sizeof s);
+    printf("client: connecting to %s\n", s);
+
+    freeaddrinfo(servinfo);
+
+    return sockfd;
+}
+
+void get_addresses(struct addrinfo* servinfo, struct request req) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof hints); //make sure the struct is empty
     hints.ai_family = AF_INET;
@@ -71,9 +134,9 @@ int get_addresses(struct addrinfo* servinfo, struct request req) {
 
     if ((rv = getaddrinfo(req.host, req.port, &hints, &servinfo)) != 0) { //send address of servinfo pointer, making it a pointer pointer
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv)); 
-        return 1;
+        exit(1);
     }
-    return 0;
+    return;
 }
 
 struct request process_cline_request(int argc, char* argv[]) {
