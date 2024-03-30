@@ -35,33 +35,39 @@ replace get_in_addr with &(((struct sockaddr_in*)sa)->sin_addr)
 #include <cstring>
 #include <arpa/inet.h>
 
-#define MAXDATASIZE 100 //might need to change
+#define MAXDATASIZE 100 //might need to change //idea: send error if buffer to big
 
-struct request process_cline_request(int, char**);
+void process_cline_request(int, char**, struct request*, struct recipient*);
 
-void get_addresses(struct addrinfo*, struct request);
+void get_addresses(struct addrinfo*, struct recipient*);
 
 int connect_socket(struct addrinfo*);
 
 void recieve_and_print(int);
 
 struct request {
-    char* host;
-    char* port;
+    char* command;
     //told we can assume max 10 arguments, each max 50 characters 
     char* arguments[11]; //includes option (whois [option] argument-list) 10+1 = 11
 };
 
+struct recipient { //the hostname and port in the command line is of the server "recipient" that we send to
+    char* host;
+    char* port;
+};
+
 int main(int argc, char* argv[]) {
     struct request req;
-    req = process_cline_request(argc, argv);
+    struct recipient recip; //recipient server
+    process_cline_request(argc, argv, &req, &recip);
     struct addrinfo* servinfo;
-    get_addresses(servinfo, req);
+    get_addresses(servinfo, &recip);
     int sockfd;
     if ((sockfd = connect_socket(servinfo)) == -1) {
         fprintf(stderr, "client: failed to connect\n"); 
         exit(1); //do i need to return???
     };
+    //send request
     recieve_and_print(sockfd);
     return 0;
 }
@@ -124,7 +130,7 @@ int connect_socket(struct addrinfo* servinfo) {
     return sockfd;
 }
 
-void get_addresses(struct addrinfo* servinfo, struct request req) {
+void get_addresses(struct addrinfo* servinfo, struct recipient* recip) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof hints); //make sure the struct is empty
     hints.ai_family = AF_INET;
@@ -132,24 +138,37 @@ void get_addresses(struct addrinfo* servinfo, struct request req) {
 
     int rv; //return value
 
-    if ((rv = getaddrinfo(req.host, req.port, &hints, &servinfo)) != 0) { //send address of servinfo pointer, making it a pointer pointer
+    if ((rv = getaddrinfo(recip->host, recip->port, &hints, &servinfo)) != 0) { //send address of servinfo pointer, making it a pointer pointer
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv)); 
         exit(1);
     }
-    return;
+    return; //servinfo holds sockets available at the host:port requested from command line, now we want to connect and send request
+    //then server will fork, execute, and return (return from its new_fd? how will client recieve)
 }
 
-struct request process_cline_request(int argc, char* argv[]) {
-    struct request req;
+void process_cline_request(int argc, char** argv, struct request* req, struct recipient* recip) { //send command and arguments ins truct only
+    
+    printf("argc: %d\n", argc); //%d for base 10
+    for (int i = 0; i < argc; i++) {
+        printf("argv [%d] = %s\n", i, argv[i]);
+    }
+
+    if (argc < 4) {
+        fprintf(stderr,"usage: requires at least 4 arguments\n");
+        exit(1);
+    }
+
     char* connection = argv[1];
     char* token = std::strtok(connection, ":");
-    req.host = token;
+    printf("host = %s\n", token);
+    recip->host = token;
     token = std::strtok(NULL, ":");
     if (token == NULL) { //no ":"
         fprintf(stderr,"usage: client hostname and port format should be hostname:server_port\n");
         exit(1);
     }
-    req.port = token; //keep port a char pointer bc that's the form it needs for subsequent functions
+    printf("port = %s\n", token);
+    recip->port = token; //keep port a char pointer bc that's the form it needs for subsequent functions
     /*
     size_t colon_pos = connection.find(':');
     if (colon_pos == string::npos) { //second argument is hostname:port, if colon not found, request invalid
@@ -161,14 +180,20 @@ struct request process_cline_request(int argc, char* argv[]) {
     req.port = stoi(connection.substr(colon_pos + 1));
     */
 
-    if (argv[2] != "whois") {
-        fprintf(stderr,"Internal error: the command is not supported!'\n");
+    char* command = argv[2];
+    printf("%s\n", command); //string format, then variatic arguments so its % things in order
+    //if (command != "whois") { //this is checking if pointer addresses are equivalent smh
+    if (strcmp(command, "whois") != 0) {
+        fprintf(stderr,"Internal error: the command is not supported!\n");
         exit(1);
     }
+    req->command = command;
 
     for (int i = 4; i <= argc; i++) { //fill out arguments in request struct
-        req.arguments[i-4] = argv[i-1];
+        int arg_idx = i-4;
+        int cmd_line_idx = i-1;
+        req->arguments[arg_idx] = argv[cmd_line_idx];
     }
     
-    return req;
+    return;
 }
