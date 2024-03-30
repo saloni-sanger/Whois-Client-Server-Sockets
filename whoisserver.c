@@ -215,18 +215,14 @@ void get_addresses(struct addrinfo** servinfo) {
         exit(1);
     }
 
-    if (*(servinfo) == NULL) { //if servinfo empty return error
-        perror("one: server: no resources"); //not giving error
-    }
-
-    struct addrinfo* p; //testing
-    char s[INET_ADDRSTRLEN];
-    for(p = *(servinfo); p != NULL; p = p->ai_next) {
+    // struct addrinfo* p; //testing
+    // char s[INET_ADDRSTRLEN];
+    // for(p = *(servinfo); p != NULL; p = p->ai_next) {
         
-        printf("IP address is: %s\n", inet_ntoa(((struct sockaddr_in*)p)->sin_addr));
-        printf("port is: %d\n", (int) ntohs(((struct sockaddr_in*)p)->sin_port)); 
+    //     printf("IP address is: %s\n", inet_ntoa(((struct sockaddr_in*)p)->sin_addr));
+    //     printf("port is: %d\n", (int) ntohs(((struct sockaddr_in*)p)->sin_port)); 
 
-    }
+    // }
 
     return;
 }

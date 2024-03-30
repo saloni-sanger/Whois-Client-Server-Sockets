@@ -39,7 +39,7 @@ replace get_in_addr with &(((struct sockaddr_in*)sa)->sin_addr)
 
 void process_cline_request(int, char**, struct request*, struct recipient*);
 
-void get_addresses(struct addrinfo*, struct recipient*);
+void get_addresses(struct addrinfo**, struct recipient*);
 
 int connect_socket(struct addrinfo*);
 
@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
     struct recipient recip; //recipient server
     process_cline_request(argc, argv, &req, &recip);
     struct addrinfo* servinfo;
-    get_addresses(servinfo, &recip);
+    get_addresses(&servinfo, &recip);
     int sockfd;
     if ((sockfd = connect_socket(servinfo)) == -1) {
         fprintf(stderr, "client: failed to connect\n"); 
@@ -130,7 +130,7 @@ int connect_socket(struct addrinfo* servinfo) {
     return sockfd;
 }
 
-void get_addresses(struct addrinfo* servinfo, struct recipient* recip) {
+void get_addresses(struct addrinfo** servinfo, struct recipient* recip) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof hints); //make sure the struct is empty
     hints.ai_family = AF_INET;
@@ -138,7 +138,7 @@ void get_addresses(struct addrinfo* servinfo, struct recipient* recip) {
 
     int rv; //return value
 
-    if ((rv = getaddrinfo(recip->host, recip->port, &hints, &servinfo)) != 0) { //send address of servinfo pointer, making it a pointer pointer
+    if ((rv = getaddrinfo(recip->host, recip->port, &hints, servinfo)) != 0) { //send address of servinfo pointer, making it a pointer pointer
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv)); 
         exit(1);
     }
