@@ -11,6 +11,18 @@ required to support MINIMUM 20 concurrent clients
 command not "whois"? send error msg 'Internal error: the command is not supported!'
 */
 
+/*
+cat printing out file contents =, can also concatenate the files
+netcat (nc) "like cat but over the network"
+nc <hostname> <port>
+opens command prompt wherer you hit enter to SEND text over TCP to that hostname:port
+
+nc -l port
+listens on that port
+
+nc 127.0.0.1 10488 for exampel
+*/
+
 //Credit: starter code from "Beej's Guide to Network Programming Using Internet Sockets"
 #include <stdio.h> 
 #include <stdlib.h> 
@@ -32,7 +44,7 @@ command not "whois"? send error msg 'Internal error: the command is not supporte
 #define ID "4137153"
 
 
-void get_addresses(struct addrinfo*);
+void get_addresses(struct addrinfo**);
 
 int make_bound_socket(struct addrinfo*); // -----------------------<
 
@@ -44,7 +56,13 @@ void main_accept_loop(int, struct sigaction*);
 
 int main(void) {
     struct addrinfo* servinfo;
-    get_addresses(servinfo); //mutates servinfo, no return needed
+    get_addresses(&servinfo); //mutates servinfo, no return needed
+
+    if (servinfo == NULL) { //if servinfo empty return error
+        perror("two: server: no resources"); //servinfo is empty here????!?!??
+        return -1;
+    }
+
     int sockfd;
     if ((sockfd = make_bound_socket(servinfo)) == -1) {
         fprintf(stderr, "server: failed to bind\n"); 
@@ -71,6 +89,9 @@ void main_accept_loop(int sockfd, struct sigaction* sa) {
     while(1) {
         sin_size = sizeof their_addr;
         new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+
+        std::cout << "got request" << std::endl;
+
         if (new_fd == -1) {
             perror("accept");
             continue; 
@@ -137,12 +158,18 @@ int make_bound_socket(struct addrinfo* servinfo) { // -----------------------<
         }
         //setsockopt()
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, 
-                sizeof(int)) == -1) { //allow multiple connections on one port
+                sizeof(yes)) == -1) { //allow multiple connections on one port
             perror("setsockopt");
             exit(1); //do i need to return???
             //why exit here instead of continue??
         }
         //bind()
+
+        char s[INET_ADDRSTRLEN]; //testing
+        inet_ntop(p->ai_family, &(((struct sockaddr_in*)p)->sin_addr), 
+                s, sizeof s);
+        printf("ip %s\n", s);
+
         if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) { 
             close(sockfd);
             perror("server: bind");
@@ -164,21 +191,43 @@ void jank_itoa(char* dest, int i){ //rename before turnin ----------------------
     sprintf(dest, "%d", i);
 }
 
-void get_addresses(struct addrinfo* servinfo) {
+void get_addresses(struct addrinfo** servinfo) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof hints); //make sure the struct is empty
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; //not 100 yet if this should be cs1.seattleu.edu, uses my IP
 
+    // char s[INET_ADDRSTRLEN]; //testing
+    // inet_ntop(hints.ai_family, &(((struct sockaddr_in*)(&hints))->sin_addr), 
+    //         s, sizeof s);
+    // printf("hints %s\n", s);
+
     int rv; //return value
     char port[6];
     jank_itoa(port, allocate_port(ID)); //allocate_port takes &char* but returns int, we need char* again
 
-    if ((rv = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) { //send address of servinfo pointer, making it a pointer pointer
+    printf("attempting to start on port %s", port);
+    std::cout << std::endl;
+
+    if ((rv = getaddrinfo(NULL, port, &hints, servinfo)) != 0) { //send address of servinfo pointer, making it a pointer pointer
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv)); 
         exit(1);
     }
+
+    if (*(servinfo) == NULL) { //if servinfo empty return error
+        perror("one: server: no resources"); //not giving error
+    }
+
+    struct addrinfo* p; //testing
+    char s[INET_ADDRSTRLEN];
+    for(p = *(servinfo); p != NULL; p = p->ai_next) {
+        
+        printf("IP address is: %s\n", inet_ntoa(((struct sockaddr_in*)p)->sin_addr));
+        printf("port is: %d\n", (int) ntohs(((struct sockaddr_in*)p)->sin_port)); 
+
+    }
+
     return;
 }
 
