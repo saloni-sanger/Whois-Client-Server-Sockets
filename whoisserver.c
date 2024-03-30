@@ -179,7 +179,7 @@ void get_addresses(struct addrinfo* servinfo) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv)); 
         exit(1);
     }
-    exit(0);
+    return;
 }
 
 void sigchld_handler(int s) {
