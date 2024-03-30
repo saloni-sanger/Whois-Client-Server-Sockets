@@ -32,7 +32,7 @@ command not "whois"? send error msg 'Internal error: the command is not supporte
 #define ID "4137153"
 
 
-int get_addresses(struct addrinfo*);
+void get_addresses(struct addrinfo*);
 
 int make_bound_socket(struct addrinfo*); // -----------------------<
 
@@ -164,7 +164,7 @@ void jank_itoa(char* dest, int i){ //rename before turnin ----------------------
     sprintf(dest, "%d", i);
 }
 
-int get_addresses(struct addrinfo* servinfo) {
+void get_addresses(struct addrinfo* servinfo) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof hints); //make sure the struct is empty
     hints.ai_family = AF_INET;
@@ -177,9 +177,9 @@ int get_addresses(struct addrinfo* servinfo) {
 
     if ((rv = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) { //send address of servinfo pointer, making it a pointer pointer
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv)); 
-        return 1;
+        exit(1);
     }
-    return 0;
+    exit(0);
 }
 
 void sigchld_handler(int s) {
