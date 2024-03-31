@@ -58,6 +58,10 @@ void sigchld_handler(int);
 
 void main_accept_loop(int, struct sigaction*);
 
+void recieve_and_dispatch(int);
+
+void execute_and_send(int, struct request*);
+
 int main(void) {
     struct addrinfo* servinfo;
     get_addresses(&servinfo); //mutates servinfo, no return needed
@@ -93,15 +97,12 @@ void main_accept_loop(int sockfd, struct sigaction* sa) {
     while(1) {
         sin_size = sizeof their_addr;
         new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-
         std::cout << "got request" << std::endl;
 
         if (new_fd == -1) {
             perror("accept");
             continue; 
         }
-
-        //server needs to recieve request, fork child, process using dup2() and execvp(), then return response
 
         inet_ntop(their_addr.ss_family, 
             &(((struct sockaddr_in*)sa)->sin_addr), 
@@ -110,31 +111,88 @@ void main_accept_loop(int sockfd, struct sigaction* sa) {
 
         //does the fork process have a copy of our servinfo and sa?? do we need to free those??
         //notice that Beej had already freed stuff before this point
-        if (!fork()) { // this is the child process now, if fork returned 0
+
+        int outer_chld_status = fork();
+        if(outer_chld_status < 0) {
+            fprintf(stderr, "server: outer child failed to fork\n"); 
+            exit(1); 
+        }
+
+        if (outer_chld_status == 0) { // this is the child process now, if fork returned 0
             close(sockfd); // child doesn't need copy of the listener 
             
-            //recieve request struct
-            struct request* req;
-            recv(new_fd, (void*)req, sizeof(*(req)), MSG_WAITALL);
-            req->num_args = ntohl(req->num_args);
-            
-            printf("command: %s\n", req->command);
-            printf("num_args: %d\n", req->num_args);
-            for (int i = 0; i < req->num_args; i++) {
-                printf("argument %d: %s\n", i+1, req->arguments[i]);
-            }
+            recieve_and_dispatch(new_fd);
 
-            //handle client request
-            //need help, how do I get messages from the client?
-            //let's move onto client before doing this part
-            if (send(new_fd, "Hello, world!", 13, 0) == -1)
-                perror("send");
-
-            close(new_fd);
+            // maybe insert a waitpid on the pid of the process doing the execve to make sure its finished writing by the time we close()------------<
+            // close(new_fd);
             exit(0); 
+        } else {
+
         }
-        close(new_fd); //parent doesn't need this
+        // close(new_fd); //parent doesn't need this
     }
+}
+
+void recieve_and_dispatch(int new_fd) { //inside outer fork
+    //recieve request struct
+    struct request req;
+    int rv = recv(new_fd, (void*)&req, sizeof(struct request), MSG_WAITALL);
+    if (rv <= 0) { //error check for recv()
+        fprintf(stderr, "server: recieve within outer fork\n"); 
+        exit(1); 
+    }
+    //return to host order
+    req.num_args = ntohl(req.num_args);
+    
+    //testing
+    printf("outer child command: %s\n", req.command);
+    printf("num_args: %d\n", req.num_args);
+    for (int i = 0; i < req.num_args; i++) {
+        printf("argument %d: %s\n", i+1, req.arguments[i]);
+    }
+
+    //execvp, function takes the name of a UNIX command to run as the first argument
+    //server needs 20 concurrent clients, running execvp terminates current program, how to do this and continue listening??
+
+    int inner_chld_status = fork();
+    if(inner_chld_status < 0) {
+        fprintf(stderr, "server: inner child failed to fork\n"); 
+        exit(1); 
+    }
+
+    if(inner_chld_status == 0) {
+        execute_and_send(new_fd, &req);
+    } else {
+
+    }
+}
+
+void execute_and_send(int new_fd, struct request* req) { //inside inner fork
+    //execvp take  a null terminated, char* array. it's easier for client to send char[], so we need to convert it 
+    //to a char*[] for the execvp() call. This also allows us to set a NULL and shorten the array if necessary, bc we did not
+    //memset the argument array to 0 initially.
+    //+1 for null termination
+    char* arg_ptrs[(req->num_args)+1]; //request array already checked for size of each string before sending
+    for (int i = 0; i < req->num_args; i++) {
+        arg_ptrs[i] = req->arguments[i];
+    }
+    arg_ptrs[req->num_args] = NULL;
+
+    //make sure we transferred from char[] to char* correctly (w/ NULL term)
+    printf("inner child command: %s\n", req->command); 
+    for (int i = 0; i < req->num_args+1; i++) {
+        printf("argument [%d] = %s\n", i+1, arg_ptrs[i]); 
+    }
+
+    //redirect standard out to socket before execvp terminates this process
+    // dup2(new_fd, STDOUT_FILENO);
+
+    // int status_code = execvp(req->command, arg_ptrs);
+
+    // if (status_code == -1) {
+    //     printf("Process did not terminate correctly\n");
+    //     exit(1);
+    // }
 }
 
 void prepare_for_connection(int sockfd, struct sigaction* sa) {
