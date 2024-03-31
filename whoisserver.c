@@ -42,8 +42,6 @@ nc 127.0.0.1 10488 for exampel
 #include "allocate.h"
 #include "protocol.h"
 
-//custom structs to return multiple things
-
 #define BACKLOG 20 //minimum 20 concurrent connections
 #define ID "4137153"
 
@@ -56,7 +54,7 @@ void prepare_for_connection(int, struct sigaction*);
 
 void sigchld_handler(int);
 
-void main_accept_loop(int, struct sigaction*);
+void main_accept_loop(int);
 
 void recieve_and_dispatch(int);
 
@@ -67,28 +65,28 @@ int main(void) {
     get_addresses(&servinfo); //mutates servinfo, no return needed
 
     if (servinfo == NULL) { //if servinfo empty return error
-        perror("two: server: no resources"); //servinfo is empty here????!?!??
+        perror("two: server: no resources"); 
         return -1;
     }
 
     int sockfd;
     if ((sockfd = make_bound_socket(servinfo)) == -1) {
         fprintf(stderr, "server: failed to bind\n"); 
-        exit(1); //do i need to return???
+        exit(1);
     };
     //being here means socket has binded, ready to listen
-    struct sigaction* sa; //need to free this now
-    prepare_for_connection(sockfd, sa);
+    struct sigaction sa; 
+    prepare_for_connection(sockfd, &sa);
 
-    // make main loop function here, figure out params  -----------------------<
-    main_accept_loop(sockfd, sa);
-
-    //freesigaction(sa); //create this
     freeaddrinfo(servinfo);
+    // make main loop function here, figure out params  -----------------------<
+    main_accept_loop(sockfd);
+
+    //freeaddrinfo(servinfo);
     return 0;
 }
 
-void main_accept_loop(int sockfd, struct sigaction* sa) {
+void main_accept_loop(int sockfd) {
     int new_fd; // listen on sock_fd, new connection on new_fd 
     struct sockaddr_storage their_addr; // connector's address information 
     socklen_t sin_size;
@@ -105,11 +103,11 @@ void main_accept_loop(int sockfd, struct sigaction* sa) {
         }
 
         inet_ntop(their_addr.ss_family, 
-            &(((struct sockaddr_in*)sa)->sin_addr), 
+            &(((struct sockaddr_in*)(struct sockaddr *)&their_addr)->sin_addr), 
             s, sizeof s);
         printf("server: got connection from %s\n", s);
 
-        //does the fork process have a copy of our servinfo and sa?? do we need to free those??
+        //does the fork process have a copy of our servinfo?do we need to free those??
         //notice that Beej had already freed stuff before this point
 
         int outer_chld_status = fork();
@@ -184,7 +182,7 @@ void execute_and_send(int new_fd, struct request* req) { //inside inner fork
     }
 
     //redirect standard out to socket before execvp terminates this process
-    dup2(new_fd, STDOUT_FILENO); //try the other way
+    dup2(new_fd, STDOUT_FILENO);
 
     int status_code = execvp(req->command, arg_ptrs);
     if (status_code == -1) {
@@ -237,7 +235,7 @@ int make_bound_socket(struct addrinfo* servinfo) { // -----------------------<
         //bind()
 
         char s[INET_ADDRSTRLEN]; //testing
-        inet_ntop(p->ai_family, &(((struct sockaddr_in*)p)->sin_addr), 
+        inet_ntop(p->ai_family, &(((struct sockaddr_in*)(struct sockaddr *)&p)->sin_addr), 
                 s, sizeof s);
         printf("ip %s\n", s);
 
@@ -268,11 +266,6 @@ void get_addresses(struct addrinfo** servinfo) {
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; //not 100 yet if this should be cs1.seattleu.edu, uses my IP
-
-    // char s[INET_ADDRSTRLEN]; //testing
-    // inet_ntop(hints.ai_family, &(((struct sockaddr_in*)(&hints))->sin_addr), 
-    //         s, sizeof s);
-    // printf("hints %s\n", s);
 
     int rv; //return value
     char port[6];
