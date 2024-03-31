@@ -37,7 +37,7 @@ replace get_in_addr with &(((struct sockaddr_in*)sa)->sin_addr)
 
 #include "protocol.h"
 
-#define MAXDATASIZE 100 //might need to change //idea: send error if buffer to big
+#define MAXDATASIZE 1000 //might need to change //idea: send error if buffer to big
 
 void process_cline_request(int, char**, struct request*, struct recipient*);
 
@@ -74,7 +74,8 @@ int main(int argc, char* argv[]) {
 void recieve_and_print(int sockfd) {
     int numbytes;
     char buf[MAXDATASIZE]; //might need to change
-    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) { 
+    memset(&buf, 0, sizeof buf);
+    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, MSG_WAITALL)) == -1) { 
         perror("recv");
         exit(1); 
     }
@@ -158,8 +159,8 @@ void process_cline_request(int argc, char** argv, struct request* req, struct re
         printf("argv [%d] = %s\n", i, argv[i]);
     }
 
-    if (argc < 4) {
-        fprintf(stderr,"usage: requires at least 4 arguments\n");
+    if (argc < 4 || argc > 14) {
+        fprintf(stderr,"usage: requires at least 4 arguments and at most 14, including an option for this whois command.\n");
         exit(1);
     }
 
