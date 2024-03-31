@@ -37,7 +37,7 @@ replace get_in_addr with &(((struct sockaddr_in*)sa)->sin_addr)
 
 #include "protocol.h"
 
-#define MAXDATASIZE 1000 //might need to change //idea: send error if buffer to big
+#define MAXDATASIZE 10000 //might need to change //idea: send error if buffer to big
 
 void process_cline_request(int, char**, struct request*, struct recipient*);
 
@@ -75,14 +75,18 @@ void recieve_and_print(int sockfd) {
     int numbytes;
     char buf[MAXDATASIZE]; //might need to change
     memset(&buf, 0, sizeof buf);
-    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, MSG_WAITALL)) == -1) { 
+    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) { 
         perror("recv");
         exit(1); 
     }
     
     buf[numbytes] = '\0';
 
-    printf("client: received '%s'\n",buf);
+    printf("client: received \n%s",buf);
+
+    if (numbytes == MAXDATASIZE-1) {
+        fprintf(stderr, "\n\nBuffer is full.\nMAXDATASIZE needs to be increased to see more.\nCurrent MAXDATASIZE value is %d.\n", MAXDATASIZE);
+    }
 
     close(sockfd);
 
