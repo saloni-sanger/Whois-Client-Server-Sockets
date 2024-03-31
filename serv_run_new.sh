@@ -1,0 +1,1 @@
+g++ whoisserver.c -o whoisserver && ./whoisserver

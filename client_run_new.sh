@@ -1,0 +1,1 @@
+g++ whoisclient.c -o whoisclient && ./whoisclient 127.0.0.1:10488 whois example.com
