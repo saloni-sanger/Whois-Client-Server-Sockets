@@ -131,7 +131,7 @@ int connect_socket(struct addrinfo* servinfo) {
     }
 
     char s[INET_ADDRSTRLEN];
-    inet_ntop(p->ai_family, &(((struct sockaddr_in*)p)->sin_addr), 
+    inet_ntop(p->ai_family, &(((struct sockaddr_in*)(struct sockaddr *)&p)->sin_addr), 
             s, sizeof s);
     printf("client: connecting to %s\n", s);
 
