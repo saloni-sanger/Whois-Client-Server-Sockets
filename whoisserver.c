@@ -120,16 +120,14 @@ void main_accept_loop(int sockfd, struct sigaction* sa) {
 
         if (outer_chld_status == 0) { // this is the child process now, if fork returned 0
             close(sockfd); // child doesn't need copy of the listener 
-            
             recieve_and_dispatch(new_fd);
 
             // maybe insert a waitpid on the pid of the process doing the execve to make sure its finished writing by the time we close()------------<
             // close(new_fd);
             exit(0); 
         } else {
-
+            close(new_fd);
         }
-        // close(new_fd); //parent doesn't need this
     }
 }
 
@@ -163,7 +161,7 @@ void recieve_and_dispatch(int new_fd) { //inside outer fork
     if(inner_chld_status == 0) {
         execute_and_send(new_fd, &req);
     } else {
-
+        close(new_fd);
     }
 }
 
@@ -172,11 +170,12 @@ void execute_and_send(int new_fd, struct request* req) { //inside inner fork
     //to a char*[] for the execvp() call. This also allows us to set a NULL and shorten the array if necessary, bc we did not
     //memset the argument array to 0 initially.
     //+1 for null termination
-    char* arg_ptrs[(req->num_args)+1]; //request array already checked for size of each string before sending
+    char* arg_ptrs[(req->num_args)+2]; //request array already checked for size of each string before sending
+    arg_ptrs[0] = req->command;
     for (int i = 0; i < req->num_args; i++) {
-        arg_ptrs[i] = req->arguments[i];
+        arg_ptrs[i+1] = req->arguments[i];
     }
-    arg_ptrs[req->num_args] = NULL;
+    arg_ptrs[(req->num_args)+1] = NULL;
 
     //make sure we transferred from char[] to char* correctly (w/ NULL term)
     printf("inner child command: %s\n", req->command); 
@@ -185,14 +184,13 @@ void execute_and_send(int new_fd, struct request* req) { //inside inner fork
     }
 
     //redirect standard out to socket before execvp terminates this process
-    // dup2(new_fd, STDOUT_FILENO);
+    dup2(new_fd, STDOUT_FILENO); //try the other way
 
-    // int status_code = execvp(req->command, arg_ptrs);
-
-    // if (status_code == -1) {
-    //     printf("Process did not terminate correctly\n");
-    //     exit(1);
-    // }
+    int status_code = execvp(req->command, arg_ptrs);
+    if (status_code == -1) {
+        printf("Process did not terminate correctly\n");
+        exit(1);
+    }
 }
 
 void prepare_for_connection(int sockfd, struct sigaction* sa) {
