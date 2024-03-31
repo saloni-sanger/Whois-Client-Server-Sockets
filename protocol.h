@@ -5,7 +5,7 @@ struct request {
     char command[MAX_ARG_LENGTH+1];//+1 for null character termination 
     //told we can assume max 10 arguments, each max 50 characters 
     uint32_t num_args;
-    char arguments[MAX_CMD_ARGS][MAX_ARG_LENGTH+1]; //+1 for null character termination 
+    char arguments[MAX_CMD_ARGS+1][MAX_ARG_LENGTH+1]; //+1 for null character termination 
 };
 
 // struct response {
