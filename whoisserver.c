@@ -79,10 +79,8 @@ int main(void) {
     prepare_for_connection(sockfd, &sa);
 
     freeaddrinfo(servinfo);
-    // make main loop function here, figure out params  -----------------------<
     main_accept_loop(sockfd);
 
-    //freeaddrinfo(servinfo);
     return 0;
 }
 
@@ -106,9 +104,6 @@ void main_accept_loop(int sockfd) {
             &(((struct sockaddr_in*)(struct sockaddr *)&their_addr)->sin_addr), 
             s, sizeof s);
         printf("server: got connection from %s\n", s);
-
-        //does the fork process have a copy of our servinfo?do we need to free those??
-        //notice that Beej had already freed stuff before this point
 
         int outer_chld_status = fork();
         if(outer_chld_status < 0) {
@@ -148,7 +143,6 @@ void recieve_and_dispatch(int new_fd) { //inside outer fork
     }
 
     //execvp, function takes the name of a UNIX command to run as the first argument
-    //server needs 20 concurrent clients, running execvp terminates current program, how to do this and continue listening??
 
     int inner_chld_status = fork();
     if(inner_chld_status < 0) {
@@ -183,6 +177,7 @@ void execute_and_send(int new_fd, struct request* req) { //inside inner fork
 
     //redirect standard out to socket before execvp terminates this process
     dup2(new_fd, STDOUT_FILENO);
+    dup2(new_fd, STDERR_FILENO);
 
     int status_code = execvp(req->command, arg_ptrs);
     if (status_code == -1) {
@@ -229,7 +224,7 @@ int make_bound_socket(struct addrinfo* servinfo) { // -----------------------<
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, 
                 sizeof(yes)) == -1) { //allow multiple connections on one port
             perror("setsockopt");
-            exit(1); //do i need to return???
+            exit(1); 
             //why exit here instead of continue??
         }
         //bind()
@@ -250,7 +245,7 @@ int make_bound_socket(struct addrinfo* servinfo) { // -----------------------<
 
     if(p == NULL) {
         fprintf(stderr, "server: failed to bind\n"); 
-        exit(1); //do i need to return???
+        exit(1); 
     }
 
     return sockfd;
@@ -265,7 +260,7 @@ void get_addresses(struct addrinfo** servinfo) {
     memset(&hints, 0, sizeof hints); //make sure the struct is empty
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE; //not 100 yet if this should be cs1.seattleu.edu, uses my IP
+    hints.ai_flags = AI_PASSIVE;
 
     int rv; //return value
     char port[6];
@@ -278,15 +273,6 @@ void get_addresses(struct addrinfo** servinfo) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv)); 
         exit(1);
     }
-
-    // struct addrinfo* p; //testing
-    // char s[INET_ADDRSTRLEN];
-    // for(p = *(servinfo); p != NULL; p = p->ai_next) {
-        
-    //     printf("IP address is: %s\n", inet_ntoa(((struct sockaddr_in*)p)->sin_addr));
-    //     printf("port is: %d\n", (int) ntohs(((struct sockaddr_in*)p)->sin_port)); 
-
-    // }
 
     return;
 }
