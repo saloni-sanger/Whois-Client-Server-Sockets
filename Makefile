@@ -1,4 +1,4 @@
-all: pa1
+all: p1
 
 pa1: whoisclient whoisserver
 		g++ whoisclient.c -o whoisclient
@@ -11,4 +11,4 @@ whoisserver: whoisserver.c
 		g++ -c whoisserver.c
 
 clean:
-		rm -f *.o pa1
+		rm -f *.o p1

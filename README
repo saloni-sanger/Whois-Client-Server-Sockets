@@ -1,0 +1,39 @@
+# A Simple WHOIS Client-Server Program
+
+### Background
+In this project I developed a network whois client program and a network whois server program using C.
+The client program, named whoisclient, is designed to run in the command line and takes the form:
+
+whoisclient hostname:server_port whois [option] argument-list
+
+This command and its arguments are sent to the whoisserver running on server_port at the computer specified by hostname.
+The whoisclient recieves the result of running the Linux whois command with these arguments, and prints out such.
+
+The server is multi-client, and can handle 20 concurrent connections.
+When the server accepts a connection, it forks a child to to recieve and process the request, as well as send the result.
+The child will fork() a second child to execute the execvp() command. The execvp() actually runs the Linux whois command, 
+and dup2() is used to redirect standard output and error to the socket connection before the execvp() function terminates
+the second/inner child process.
+
+#### Project Strengths
+- Return values for system calls are checked for errors.
+- Memory leaks avoided with proper use of scopes and closing unused file descriptors.
+- Displayed messages have nice formatting.
+- While no debugging messages are displayed, enough is printed to prove that the client's request is being processed 
+correctly.
+
+#### Project Weaknesses
+- Code repitition could be refined through .h files or functions within the program.
+- Large functions should be shrunk by use of helper functions.
+- Standard output and error are not guaranteed to display in a nice manner. dup2() directed both to the socket, so the 
+messages can get jumbled. A response struct could help this, but would also be complicated.
+
+#### Makefile
+
+##### all:
+make all is equivalent to make p1.
+##### p1:
+make p1 creates executables for the 2 programs,
+will compile if needed to update or create.
+##### clean:
+Will erase the .o files created by make p1 or make all.
