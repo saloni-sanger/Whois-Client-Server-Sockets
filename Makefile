@@ -1,6 +1,6 @@
 all: p1
 
-pa1: whoisclient whoisserver
+p1: whoisclient whoisserver
 		g++ whoisclient.c -o whoisclient
 		g++ whoisserver.c -o whoisserver
 
