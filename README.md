@@ -23,6 +23,7 @@ the second/inner child process.
 correctly.
 
 #### Project Weaknesses
+- Client recv() is not in a loop. If the response is more than MAX_DATA_LENGTH it will be cut off.
 - Code repitition could be refined through .h files or functions within the program.
 - Large functions should be shrunk by use of helper functions.
 - Standard output and error are not guaranteed to display in a nice manner. dup2() directed both to the socket, so the 
